@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalkulator BMI, BMR i zapotrzebowania kalorycznego</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    form label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    form input, form select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+      user-select: text; /* umożliwia zaznaczanie, kopiowanie itp. */
+    }
+    form input[type="radio"] {
+      width: auto;
+      margin-right: 5px;
+    }
+    form button {
+      margin-top: 15px;
+      padding: 10px;
+      width: 100%;
+      background-color: #007ACC;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    form button:hover {
+      background-color: #005F99;
+    }
+    #wyniki {
+      max-width: 500px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+  <!-- Dołączamy bibliotekę jsPDF (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <h1>Kalkulator BMI, BMR i zapotrzebowania kalorycznego</h1>
+  <form id="calcForm">
+    <!-- Dane pacjenta -->
+    <label for="imie">Imię:</label>
+    <input type="text" id="imie" name="imie" required>
+
+    <label for="nazwisko">Nazwisko:</label>
+    <input type="text" id="nazwisko" name="nazwisko" required>
+
+    <label for="plec">Płeć:</label>
+    <input type="radio" id="mezczyzna" name="plec" value="M" required>
+    <label for="mezczyzna" style="display:inline;">Mężczyzna</label>
+    <input type="radio" id="kobieta" name="plec" value="K" required>
+    <label for="kobieta" style="display:inline;">Kobieta</label>
+
+    <label for="wiek">Wiek:</label>
+    <input type="number" id="wiek" name="wiek" required>
+
+    <label for="waga">Masa ciała [kg]:</label>
+    <input type="number" id="waga" name="waga" required step="any">
+
+    <label for="wzrost">Wzrost [cm]:</label>
+    <input type="number" id="wzrost" name="wzrost" required step="any">
+
+    <label for="masaBeztluszczowa">Beztłuszczowa masa ciała [kg]:</label>
+    <input type="number" id="masaBeztluszczowa" name="masaBeztluszczowa" required step="any">
+
+    <!-- Wybór wzoru BMR -->
+    <label for="wyborWzoru">Wybierz wzór na BMR:</label>
+    <select id="wyborWzoru">
+      <option value="mifflin">Mifflin-St Jeor (Początkujący, osoby z nadwagą, zdrowi dorośli)</option>
+      <option value="harris">Harrisa-Benedicta (Osoby o przeciętnej masie ciała i aktywności)</option>
+      <option value="katch">Katch-McArdle (Sportowcy, osoby z niskim % tłuszczu)</option>
+      <option value="cunningham">Cunningham (Zawodowcy po analizie laboratoryjnej)</option>
+    </select>
+
+    <!-- Wybór PAL -->
+    <label for="pal">Wybierz wartość PAL:</label>
+    <select id="pal"></select>
+
+    <button type="button" onclick="oblicz()">Oblicz</button>
+    <!-- Tabela informacyjna o PAL -->
+<div id="palInfo">
+    <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse: collapse; margin-top:20px;">
+      <thead>
+        <tr>
+          <th>PAL</th>
+          <th>Opis</th>
+          <th>Przykład</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1.1</td>
+          <td>Osoba leżąca, brak aktywności.</td>
+          <td>Pobyt w szpitalu, rekonwalescencja, całkowity brak ruchu.</td>
+        </tr>
+        <tr>
+          <td>1.2</td>
+          <td>Praca siedząca, prawie żadna aktywność.</td>
+          <td>&lt;2 000 kroków dziennie, brak treningów, siedzący tryb życia.</td>
+        </tr>
+        <tr>
+          <td>1.3</td>
+          <td>Praca siedząca + sporadyczne spacery.</td>
+          <td>2 000–3 000 kroków dziennie, brak treningów lub pojedynczy w miesiącu.</td>
+        </tr>
+        <tr>
+          <td>1.4</td>
+          <td>Praca siedząca + lekkie aktywności w ciągu dnia.</td>
+          <td>3 000–4 000 kroków dziennie, okazjonalny ruch (np. weekendowy spacer, drobne obowiązki domowe).</td>
+        </tr>
+        <tr>
+          <td>1.5</td>
+          <td>Praca siedząca + lekka aktywność fizyczna kilka razy w tygodniu.</td>
+          <td>4 000–6 000 kroków dziennie, 1–2 treningi/tydzień o niskiej intensywności (np. joga, spacer, rower rekreacyjny).</td>
+        </tr>
+        <tr>
+          <td>1.6</td>
+          <td>Praca siedząca lub umiarkowana + 2–3 lekkie treningi tygodniowo.</td>
+          <td>6 000–8 000 kroków dziennie, 2–3 treningi o średniej intensywności (np. siłownia, fitness, szybki marsz).</td>
+        </tr>
+        <tr>
+          <td>1.7</td>
+          <td>Praca siedząca + regularne treningi.</td>
+          <td>8 000–10 000 kroków dziennie, 3–4 treningi tygodniowo o średniej intensywności.</td>
+        </tr>
+        <tr>
+          <td>1.8</td>
+          <td>Praca aktywna lub siedząca z dużą ilością aktywności fizycznej.</td>
+          <td>10 000–12 000 kroków dziennie, 4–5 treningów w tygodniu, często inne aktywności (np. rower do pracy, spacery).</td>
+        </tr>
+        <tr>
+          <td>1.9</td>
+          <td>Praca fizyczna lekkiego stopnia + regularne treningi.</td>
+          <td>12 000–14 000 kroków dziennie, 5 treningów w tygodniu (średnia do wysokiej intensywności).</td>
+        </tr>
+        <tr>
+          <td>2.0</td>
+          <td>Praca fizyczna umiarkowana + treningi sportowe.</td>
+          <td>14 000–16 000 kroków dziennie, 5–6 intensywnych treningów tygodniowo.</td>
+        </tr>
+        <tr>
+          <td>2.1</td>
+          <td>Praca fizyczna + treningi sportowe.</td>
+          <td>16 000–18 000 kroków dziennie, 6 treningów tygodniowo (siłownia, bieganie, sporty zespołowe).</td>
+        </tr>
+        <tr>
+          <td>2.2</td>
+          <td>Bardzo aktywny tryb życia – sportowiec amator.</td>
+          <td>18 000–20 000 kroków dziennie, codzienne intensywne treningi + aktywna praca (np. trener personalny, kurier pieszy).</td>
+        </tr>
+        <tr>
+          <td>2.3</td>
+          <td>Osoba bardzo aktywna fizycznie + zawodowa aktywność.</td>
+          <td>&gt;20 000 kroków dziennie, zawodnik sportów wytrzymałościowych lub ciężka praca fizyczna + treningi.</td>
+        </tr>
+        <tr>
+          <td>2.4</td>
+          <td>Sportowiec trenujący codziennie 2x dziennie.</td>
+          <td>Treningi poranne i wieczorne, wysoka objętość treningowa, dodatkowa praca fizyczna.</td>
+        </tr>
+        <tr>
+          <td>2.5</td>
+          <td>Zawodowy sportowiec, bardzo wysoka aktywność.</td>
+          <td>Sportowiec na etapie przygotowań do zawodów, 2–3 jednostki treningowe dziennie.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+    <button type="button" onclick="downloadPDF()">Pobierz PDF</button>
+  </form>
+
+  <div id="wyniki"></div>
+
+  <script>
+    // Wypełnij dropdown PAL – wartości od 1.1 do 2.5 co 0.1
+    const palSelect = document.getElementById('pal');
+    for (let i = 1.1; i <= 2.6; i += 0.1) {
+      let option = document.createElement('option');
+      option.value = i.toFixed(1);
+      option.textContent = i.toFixed(1);
+      palSelect.appendChild(option);
+    }
+
+    function oblicz() {
+      // Pobieranie danych z formularza
+      var imie = document.getElementById('imie').value;
+      var nazwisko = document.getElementById('nazwisko').value;
+      var plec = document.querySelector('input[name="plec"]:checked').value;
+      var wiek = parseFloat(document.getElementById('wiek').value);
+      var waga = parseFloat(document.getElementById('waga').value);
+      var wzrost = parseFloat(document.getElementById('wzrost').value);
+      var masaBeztluszczowa = parseFloat(document.getElementById('masaBeztluszczowa').value);
+      var wyborWzoru = document.getElementById('wyborWzoru').value;
+      var pal = parseFloat(document.getElementById('pal').value);
+      
+      // Obliczanie BMI: masa / (wzrost w metrach)^2
+      var wzrostMetry = wzrost / 100;
+      var bmi = waga / (wzrostMetry * wzrostMetry);
+      bmi = parseFloat(bmi.toFixed(2));
+      
+      var kategoriaBMI = '';
+      if (bmi < 18.5) {
+        kategoriaBMI = 'Niedowaga';
+      } else if (bmi >= 18.5 && bmi < 24.9) {
+        kategoriaBMI = 'Prawidłowa masa ciała';
+      } else if (bmi >= 25 && bmi < 29.9) {
+        kategoriaBMI = 'Nadwaga';
+      } else {
+        kategoriaBMI = 'Otyłość';
+      }
+      
+      // Obliczanie BMR wg wybranego wzoru
+      var bmr;
+      if (wyborWzoru === 'mifflin') {
+        // Mifflin-St Jeor
+        bmr = plec === 'M'
+              ? (10 * waga) + (6.25 * wzrost) - (5 * wiek) + 5
+              : (10 * waga) + (6.25 * wzrost) - (5 * wiek) - 161;
+      } else if (wyborWzoru === 'harris') {
+        // Harris-Benedict
+        bmr = plec === 'M'
+              ? 66.5 + (13.75 * waga) + (5.003 * wzrost) - (6.755 * wiek)
+              : 655.1 + (9.563 * waga) + (1.850 * wzrost) - (4.676 * wiek);
+      } else if (wyborWzoru === 'katch') {
+        // Katch-McArdle
+        bmr = 370 + (21.6 * masaBeztluszczowa);
+      } else if (wyborWzoru === 'cunningham') {
+        // Cunningham
+        bmr = 500 + (22 * masaBeztluszczowa);
+      }
+      bmr = parseFloat(bmr.toFixed(2));
+
+      // Obliczanie zapotrzebowania kalorycznego: BMR * PAL
+      var zapotrzebowanieKaloryczne = parseFloat((bmr * pal).toFixed(2));
+
+      // Wyświetlenie wyników na stronie
+      var wynikiDiv = document.getElementById('wyniki');
+      wynikiDiv.innerHTML =
+        '<h2>Wyniki dla ' + imie + ' ' + nazwisko + '</h2>' +
+        '<p><strong>Imię:</strong> ' + imie + '</p>' +
+        '<p><strong>Nazwisko:</strong> ' + nazwisko + '</p>' +
+        '<p><strong>Płeć:</strong> ' + (plec === 'M' ? 'Mężczyzna' : 'Kobieta') + '</p>' +
+        '<p><strong>Wiek:</strong> ' + wiek + '</p>' +
+        '<p><strong>Masa ciała:</strong> ' + waga + ' kg</p>' +
+        '<p><strong>Wzrost:</strong> ' + wzrost + ' cm</p>' +
+        '<p><strong>Beztłuszczowa masa:</strong> ' + masaBeztluszczowa + ' kg</p>' +
+        '<p><strong>BMI:</strong> ' + bmi + ' (' + kategoriaBMI + ')</p>' +
+        '<p><strong>BMR (' + document.getElementById('wyborWzoru').options[document.getElementById('wyborWzoru').selectedIndex].text + '):</strong> ' + bmr + ' kcal/dzień</p>' +
+        '<p><strong>PAL:</strong> ' + pal + '</p>' +
+        '<p><strong>Zapotrzebowanie kaloryczne:</strong> ' + zapotrzebowanieKaloryczne + ' kcal/dzień</p>';
+    }
+
+    async function downloadPDF() {
+      // Pobieranie danych z formularza
+      var imie = document.getElementById('imie').value;
+      var nazwisko = document.getElementById('nazwisko').value;
+      var plecElem = document.querySelector('input[name="plec"]:checked');
+      var plec = plecElem ? plecElem.value : '';
+      var wiek = document.getElementById('wiek').value;
+      var waga = document.getElementById('waga').value;
+      var wzrost = document.getElementById('wzrost').value;
+      var masaBeztluszczowa = document.getElementById('masaBeztluszczowa').value;
+      var wyborWzoru = document.getElementById('wyborWzoru').options[document.getElementById('wyborWzoru').selectedIndex].text;
+      var pal = document.getElementById('pal').value;
+      
+      // Ponowne przeliczenie wyników (można też zapisać wyniki z funkcji oblicz)
+      var wzrostMetry = wzrost / 100;
+      var bmi = waga / (wzrostMetry * wzrostMetry);
+      bmi = parseFloat(bmi.toFixed(2));
+      var kategoriaBMI = '';
+      if (bmi < 18.5) {
+        kategoriaBMI = 'Niedowaga';
+      } else if (bmi >= 18.5 && bmi < 24.9) {
+        kategoriaBMI = 'Prawidłowa masa ciała';
+      } else if (bmi >= 25 && bmi < 29.9) {
+        kategoriaBMI = 'Nadwaga';
+      } else {
+        kategoriaBMI = 'Otyłość';
+      }
+      
+      var bmr;
+      if (wyborWzoru.includes('Mifflin')) {
+        bmr = plec === 'M'
+              ? (10 * waga) + (6.25 * wzrost) - (5 * wiek) + 5
+              : (10 * waga) + (6.25 * wzrost) - (5 * wiek) - 161;
+      } else if (wyborWzoru.includes('Harris')) {
+        bmr = plec === 'M'
+              ? 66.5 + (13.75 * waga) + (5.003 * wzrost) - (6.755 * wiek)
+              : 655.1 + (9.563 * waga) + (1.850 * wzrost) - (4.676 * wiek);
+      } else if (wyborWzoru.includes('Katch')) {
+        bmr = 370 + (21.6 * masaBeztluszczowa);
+      } else if (wyborWzoru.includes('Cunningham')) {
+        bmr = 500 + (22 * masaBeztluszczowa);
+      }
+      bmr = parseFloat(bmr.toFixed(2));
+
+      var zapotrzebowanieKaloryczne = parseFloat((bmr * pal).toFixed(2));
+
+      // Tworzenie PDF przy użyciu jsPDF
+      const { jsPDF } = window.jspdf;
+      var doc = new jsPDF();
+
+      var yPosition = 10;
+      var lineHeight = 10;
+      
+      function addLine(label, value) {
+        doc.setFont("helvetica", "normal");
+        doc.text(label + " ", 10, yPosition);
+        doc.setFont("helvetica", "bold");
+        // Obliczamy szerokość tekstu etykiety, aby wartość była wyświetlona obok niej
+        var labelWidth = doc.getTextWidth(label + " ");
+        doc.text(String(value), 10 + labelWidth, yPosition);
+        yPosition += lineHeight;
+      }
+      
+      addLine("Imię:", imie);
+      addLine("Nazwisko:", nazwisko);
+      addLine("Płeć:", plec === 'M' ? 'Mężczyzna' : 'Kobieta');
+      addLine("Wiek:", wiek);
+      addLine("Masa ciała [kg]:", waga);
+      addLine("Wzrost [cm]:", wzrost);
+      addLine("Beztłuszczowa masa [kg]:", masaBeztluszczowa);
+      addLine("BMI:", bmi + " (" + kategoriaBMI + ")");
+      addLine("BMR (" + wyborWzoru + "):", bmr + " kcal/dzień");
+      addLine("PAL:", pal);
+      addLine("Zapotrzebowanie kaloryczne:", zapotrzebowanieKaloryczne + " kcal/dzień");
+
+      doc.save("dane_pacjenta_" + imie + "_" + nazwisko + ".pdf");
+    }
+  </script>
+</body>
+</html
